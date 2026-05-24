@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台股雙週期 K 線介面</title>
+  <link rel="preconnect" href="https://api.fontshare.com" />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <style>
+    :root, [data-theme="light"] {
+      --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+      --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+      --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+      --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+      --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
+      --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem;
+      --space-12: 3rem; --space-16: 4rem; --radius-sm: 0.375rem; --radius-md: 0.5rem;
+      --radius-lg: 0.75rem; --radius-xl: 1rem; --radius-full: 9999px;
+      --color-bg: #f7f6f2; --color-surface: #f9f8f5; --color-surface-2: #fbfbf9;
+      --color-surface-offset: #f3f0ec; --color-border: #d4d1ca; --color-divider: #dcd9d5;
+      --color-text: #28251d; --color-text-muted: #7a7974; --color-text-faint: #bab9b4;
+      --color-text-inverse: #f9f8f4; --color-primary: #01696f; --color-primary-hover: #0c4e54;
+      --color-success: #1d8f56; --color-danger: #c84b5f; --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+      --font-body: 'Satoshi', 'Inter', sans-serif;
+    }
+    [data-theme="dark"] {
+      --color-bg: #171614; --color-surface: #1c1b19; --color-surface-2: #201f1d;
+      --color-surface-offset: #22211f; --color-border: #393836; --color-divider: #262523;
+      --color-text: #cdccca; --color-text-muted: #979693; --color-text-faint: #5a5957;
+      --color-text-inverse: #171614; --color-primary: #4f98a3; --color-primary-hover: #66acb6;
+      --color-success: #46b46f; --color-danger: #e46a80; --shadow-md: 0 10px 24px rgba(0,0,0,.28);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow-y: auto; }
+    body {
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      color: var(--color-text);
+      background: var(--color-bg);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    button, input, select { font: inherit; color: inherit; }
+    .app {
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    .topbar {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+    }
+    .brand { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+    .logo { width: 28px; height: 28px; color: var(--color-primary); }
+    .brand-text strong { display: block; font-size: var(--text-sm); }
+    .brand-text span { display: block; font-size: var(--text-xs); color: var(--color-text-muted); }
+    .top-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; justify-content: flex-end; }
+    .single-row-bar { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 18px; padding: 10px 14px; }
+    .compact-brand { gap: 10px; white-space: nowrap; }
+    .compact-brand-text strong { font-size: 14px; line-height: 1.05; }
+    .compact-brand-text span { font-size: 11px; line-height: 1.05; }
+    .header-inline { display: grid; grid-template-columns: 220px 1fr 40px; align-items: center; gap: 10px; min-width: 0; }
+    .compact-search { box-shadow: none; padding: 0; min-width: 0; height: 34px; display: flex; align-items: center; gap: 8px; background: transparent; border: none; border-radius: 0; }
+    .compact-search input { flex: 1; min-width: 0; padding: 0 12px; font-size: 13px; height: 34px; border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent); border-radius: var(--radius-full); background: var(--color-surface-2); outline: none; }
+    .compact-search input:focus { border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-border)); }
+    .compact-btn { padding: 0 16px; height: 34px; font-size: 13px; line-height: 1; min-height: unset; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; }
+    .inline-metrics { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; min-width: 0; }
+    .inline-card { min-width: 0; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 12px; background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 92%, transparent), var(--color-surface-offset)); border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent); box-shadow: var(--shadow-md); overflow-y: auto; }
+    .inline-label { color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
+    .inline-value { font-size: 13px; font-weight: 700; white-space: nowrap; overflow-y: auto; text-overflow: ellipsis; }
+    .inline-sub { color: var(--color-text-muted); font-size: 11px; white-space: nowrap; overflow-y: auto; text-overflow: ellipsis; }
+    .compact-theme { width: 34px; height: 34px; }
+    .searchbar {
+      display: flex; align-items: center; gap: var(--space-2);
+      background: var(--color-surface-2);
+      border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+      padding: var(--space-2); border-radius: var(--radius-full); box-shadow: var(--shadow-md);
+    }
+    .searchbar input {
+      width: min(34vw, 240px); min-width: 160px; border: 0; outline: 0; background: transparent;
+      padding: 0 var(--space-2);
+    }
+    .btn, .chip {
+      border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+      background: var(--color-surface-2);
+      padding: 0.62rem 0.9rem; border-radius: var(--radius-full);
+      transition: .18s ease;
+    }
+    .btn:hover, .chip:hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); }
+    .btn.primary { background: var(--color-primary); color: var(--color-text-inverse); border-color: transparent; }
+    .btn.primary:hover { background: var(--color-primary-hover); }
+    .theme-btn { width: 42px; height: 42px; display: grid; place-items: center; }
+    .main {
+      overflow-y: auto; overscroll-behavior: contain;
+      padding: 8px 12px 8px;
+      display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto;
+    }
+    .summary {
+      display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: 10px;
+      align-items: stretch;
+    }
+    .card, .panel {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 92%, transparent), var(--color-surface-offset));
+      border: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md);
+    }
+    .card { padding: 10px 14px; }
+    .summary-card { min-height: 44px; display: flex; flex-direction: column; justify-content: center; }
+    .summary-card.wide { min-width: 0; }
+    .compact-summary .card { border-radius: 14px; }
+    .kpi-label { color: var(--color-text-muted); font-size: 11px; margin-bottom: 1px; line-height: 1.1; }
+    .kpi-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.05; }
+    .kpi-sub { margin-top: 1px; color: var(--color-text-muted); font-size: 11px; line-height: 1.05; }
+    .positive { color: var(--color-success); }
+    .negative { color: var(--color-danger); }
+    .panel-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4);
+      padding: var(--space-4) var(--space-4) var(--space-3);
+      border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+    }
+    .panel-title h2 { margin: 0; font-size: var(--text-lg); }
+    .panel-title p { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-text-muted); }
+    .control-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+    .range-group { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }
+    .chip { cursor: pointer; font-size: 12px; padding: 0.32rem 0.55rem; border-radius: 8px; min-height: 28px; line-height: 1; }
+    .chip.active { background: color-mix(in srgb, var(--color-primary) 18%, var(--color-surface-2)); border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); color: var(--color-primary); }
+    .chart-wrap { padding: var(--space-2) var(--space-3) 0; }
+    .chart { width: 100%; height: 320px; }
+    .footer-note { padding: 2px var(--space-2) 4px; color: var(--color-text-muted); font-size: 11px; }
+    .charts-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .panel-head { padding: var(--space-2) var(--space-4) var(--space-2); }
+    .panel-title h2 { font-size: 14px; }
+    .panel-title p { display: none; }
+    .range-group { gap: 4px; }
+    .chip { font-size: 11px; padding: 0.22rem 0.45rem; min-height: 24px; }
+    .fullscreen-overlay {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: var(--color-bg);
+      flex-direction: column;
+    }
+    .fullscreen-overlay.active { display: flex; }
+    .fullscreen-overlay .panel {
+      flex: 1; display: flex; flex-direction: column; border-radius: 0; border: none; overflow-y: auto;
+    }
+    .fullscreen-overlay .panel-head { padding: 8px 14px; }
+    .fullscreen-overlay .chart-wrap { flex: 0 0 auto; }
+    .fullscreen-overlay .chart { height: calc(50vh - 80px) !important; }
+    .fullscreen-overlay
+    .fullscreen-overlay
+    .expand-btn {
+      width: 28px !important; height: 28px !important; border-radius: 8px !important;
+      border: 1px solid rgba(128,128,128,0.3) !important;
+      background: rgba(30,30,30,0.85) !important;
+      color: #888 !important;
+      cursor: pointer; display: grid; place-items: center;
+      transition: background .15s, border-color .15s, color .15s;
+      flex-shrink: 0; padding: 0;
+    }
+    .expand-btn:hover {
+      background: rgba(60,60,60,0.9) !important;
+      border-color: rgba(128,128,128,0.5) !important;
+      color: #bbb !important;
+    }
+    .expand-btn svg { display: block; stroke: #888; }
+    .expand-btn:hover svg { stroke: #bbb; }
+    .charts-grid.expanded-daily #weeklyPanel { display: none; }
+    .charts-grid.expanded-daily { grid-template-columns: 1fr; }
+    .charts-grid.expanded-weekly #dailyPanel { display: none; }
+    .charts-grid.expanded-weekly { grid-template-columns: 1fr; }
+    .charts-grid.expanded-daily .chart,
+    .charts-grid.expanded-weekly .chart { height: 340px; }
+    .charts-grid.expanded-daily .inst-chart,
+    .charts-grid.expanded-weekly
+      display: none; padding: var(--space-10); text-align: center; color: var(--color-text-muted);
+    }
+    @media (max-width: 1200px) {
+      .header-inline { grid-template-columns: 200px 1fr 40px; }
+      .inline-metrics { grid-template-columns: 1fr; }
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      html, body { overflow: auto; }
+      .app { height: auto; min-height: 100dvh; }
+      .single-row-bar { grid-template-columns: 1fr; align-items: start; }
+      .header-inline { grid-template-columns: 1fr; }
+      .inline-metrics { grid-template-columns: 1fr; }
+      .main { overflow: visible; padding: 8px; }
+      .panel-head { flex-direction: column; }
+      .chart { height: 320px; }
+      .searchbar { width: 100%; }
+      .searchbar input { width: 100%; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar single-row-bar">
+      <div class="brand compact-brand">
+        <svg class="logo" viewBox="0 0 64 64" fill="none" aria-label="台股圖表標誌">
+          <rect x="8" y="10" width="12" height="44" rx="4" fill="currentColor" opacity="0.35"></rect>
+          <rect x="26" y="20" width="12" height="34" rx="4" fill="currentColor" opacity="0.6"></rect>
+          <path d="M46 50V14" stroke="currentColor" stroke-width="8" stroke-linecap="round"></path>
+        </svg>
+        <div class="brand-text compact-brand-text">
+          <strong>台股雙週期 K 線</strong>
+          <span>日 K / 週 K 同頁檢視</span>
+        </div>
+      </div>
+
+      <div class="header-inline">
+        <div class="searchbar compact-search">
+          <input id="symbolInput" type="text" placeholder="2330 / 台積電" aria-label="輸入台股代號或名稱" />
+          <button id="searchBtn" class="btn primary compact-btn">查詢</button>
+        </div>
+
+        <div class="inline-metrics" id="summaryCards">
+          <article class="inline-card"><span class="inline-label">股票：</span><span class="inline-value" id="kpiName">--</span><span class="inline-sub" id="kpiSymbolSub"></span></article>
+          <article class="inline-card"><span class="inline-label">最新收盤：</span><span class="inline-value" id="kpiClose">--</span><span class="inline-sub" id="kpiDate" style="color:var(--color-text-faint);font-size:11px;white-space:nowrap;"></span><span class="inline-sub" id="kpiChange">--</span></article>
+          <article class="inline-card"><span class="inline-label">近一年區間：</span><span class="inline-value" id="kpiRange">--</span><span class="inline-sub">最高 / 最低</span></article>
+        </div>
+
+        <button class="btn theme-btn compact-theme" id="themeToggle" aria-label="切換明暗模式">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- 全螢幕 overlay -->
+      <div class="fullscreen-overlay" id="fullscreenOverlay"></div>
+      <section class="charts-grid" id="chartsGrid">
+        <section class="panel" id="dailyPanel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <h2>日 K 趨勢</h2>
+            </div>
+            <div class="control-row">
+              <div class="range-group" id="dailyRanges"></div>
+              <button class="expand-btn" id="dailyExpandBtn" onclick="toggleExpand('daily')" title="放大"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+            </div>
+          </div>
+          <div class="chart-wrap"><div id="dailyChart" class="chart"></div></div><div class="footer-note">日 K 價格 + 日成交量。</div>
+        </section>
+
+        <section class="panel" id="weeklyPanel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <h2>週 K 趨勢</h2>
+            </div>
+            <div class="control-row">
+              <div class="range-group" id="weeklyRanges"></div>
+              <button class="expand-btn" id="weeklyExpandBtn" onclick="toggleExpand('weekly')" title="放大"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+            </div>
+          </div>
+          <div class="chart-wrap"><div id="weeklyChart" class="chart"></div></div><div class="footer-note">週 K 價格 + 週成交量。</div>
+        </section>
+      </section>
+
+      <section class="panel empty" id="emptyState">
+        輸入台股代號或名稱後即可載入雙區塊圖表，例如 2330、2317、2454。
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const RANGE_OPTIONS = [
+      { key: '1w', label: '1 週', days: 7 },
+      { key: '1m', label: '1 月', days: 30 },
+      { key: '3m', label: '3 月', days: 90 },
+      { key: '6m', label: '6 月', days: 180 },
+      { key: '1y', label: '1 年', days: 365 },
+      { key: '3y', label: '3 年', days: 365 * 3 },
+      { key: '5y', label: '5 年', days: 365 * 5 },
+      { key: '7y', label: '7 年', days: 365 * 7 },
+      { key: '10y', label: '10 年', days: 365 * 10 }
+    ];
+
+    const state = {
+      theme: 'dark', symbol: '2330', stockName: '台積電',
+      rawDaily: [], weekly: [],
+      instForeign: {}, instTrust: {},
+      dailyRange: '1y', weeklyRange: '1y'
+    };
+
+    const symbolInput = document.getElementById('symbolInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const emptyState = document.getElementById('emptyState');
+
+    function setTheme(theme) {
+      state.theme = theme;
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('themeToggle').innerHTML = theme === 'dark'
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+    }
+
+    const ICON_EXPAND  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+    const ICON_COLLAPSE = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
+
+    let expandedPanel = null;
+
+    function toggleExpand(which) {
+      const overlay = document.getElementById('fullscreenOverlay');
+
+      if (expandedPanel === which) {
+        const panel = document.getElementById(which + 'Panel');
+        const grid = document.getElementById('chartsGrid');
+        if (which === 'daily') grid.insertBefore(panel, grid.firstElementChild);
+        else grid.appendChild(panel);
+        overlay.classList.remove('active');
+        overlay.innerHTML = '';
+        expandedPanel = null;
+        document.getElementById(which + 'ExpandBtn').innerHTML = ICON_EXPAND;
+        setTimeout(() => resizeAllCharts(), 80);
+        return;
+      }
+
+      if (expandedPanel) toggleExpand(expandedPanel);
+
+      const panel = document.getElementById(which + 'Panel');
+      overlay.appendChild(panel);
+      overlay.classList.add('active');
+      expandedPanel = which;
+      document.getElementById(which + 'ExpandBtn').innerHTML = ICON_COLLAPSE;
+      setTimeout(() => resizeAllCharts(), 80);
+    }
+
+    function resizeAllCharts() {
+      ['dailyChart','weeklyChart'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.data) Plotly.Plots.resize(el);
+      });
+    }
+
+    function cssVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function formatPrice(v) {
+      if (v == null || Number.isNaN(v)) return '--';
+      return Number(v).toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function getCutoff(days) {
+      const now = new Date();
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - days);
+      return cutoff;
+    }
+
+    function aggregateWeekly(rows) {
+      const buckets = new Map();
+      rows.forEach((row) => {
+        const d = new Date(row.date);
+        const day = d.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        const monday = new Date(d);
+        monday.setDate(d.getDate() + diff);
+        const key = monday.toISOString().slice(0, 10);
+        if (!buckets.has(key)) {
+          buckets.set(key, { date: key, open: row.open, high: row.max, low: row.min, close: row.close, volume: row.Trading_Volume });
+        } else {
+          const b = buckets.get(key);
+          b.high = Math.max(b.high, row.max);
+          b.low = Math.min(b.low, row.min);
+          b.close = row.close;
+          b.volume += row.Trading_Volume;
+        }
+      });
+      return [...buckets.values()].sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    async function resolveSymbol(query) {
+      const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo`;
+      const res = await fetch(url);
+      const json = await res.json();
+      const list = json.data || [];
+      const normalized = String(query).trim();
+      const found = list.find(item => item.stock_id === normalized)
+        || list.find(item => item.stock_name === normalized)
+        || list.find(item => item.stock_name && item.stock_name.includes(normalized));
+      if (!found) {
+        if (/^\d{4,6}$/.test(normalized)) return { stock_id: normalized, stock_name: normalized };
+        throw new Error('找不到對應股票');
+      }
+      return found;
+    }
+
+    async function fetchDailyStock(symbol) {
+      const start = new Date();
+      start.setFullYear(start.getFullYear() - 10);
+      const startDate = start.toISOString().slice(0, 10);
+      const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${encodeURIComponent(symbol)}&start_date=${startDate}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (!json.data || !json.data.length) throw new Error('查無價格資料');
+      return json.data
+        .filter(row => row.close != null && row.open != null && row.max != null && row.min != null)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    function buildRangeButtons(containerId, activeKey, setter) {
+      const wrap = document.getElementById(containerId);
+      wrap.innerHTML = '';
+      RANGE_OPTIONS.forEach(option => {
+        const btn = document.createElement('button');
+        btn.className = 'chip' + (option.key === activeKey ? ' active' : '');
+        btn.textContent = option.label;
+        btn.addEventListener('click', () => setter(option.key));
+        wrap.appendChild(btn);
+      });
+    }
+
+    function filterRows(rows, rangeKey) {
+      const option = RANGE_OPTIONS.find(r => r.key === rangeKey) || RANGE_OPTIONS[4];
+      const cutoff = getCutoff(option.days);
+      const filtered = rows.filter(row => new Date(row.date) >= cutoff);
+      return filtered.length ? filtered : rows.slice(-Math.max(5, Math.min(rows.length, option.days)));
+    }
+
+    function updateSummary(rows) {
+      const latest = rows[rows.length - 1];
+      const prev = rows[rows.length - 2] || latest;
+      const yearRows = filterRows(rows, '1y');
+      const highs = yearRows.map(r => r.max);
+      const lows = yearRows.map(r => r.min);
+      const change = latest.close - prev.close;
+      const pct = prev.close ? (change / prev.close) * 100 : 0;
+      document.getElementById('kpiName').textContent = state.stockName || state.symbol;
+      document.getElementById('kpiSymbolSub').textContent = `${state.symbol}`;
+      document.getElementById('kpiClose').textContent = formatPrice(latest.close);
+      const dateEl = document.getElementById('kpiDate');
+      if (latest.date) {
+        const d = new Date(latest.date);
+        dateEl.textContent = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+      } else { dateEl.textContent = ''; }
+      const changeEl = document.getElementById('kpiChange');
+      changeEl.textContent = `${change >= 0 ? '+' : ''}${formatPrice(change)} (${change >= 0 ? '+' : ''}${pct.toFixed(2)}%)`;
+      changeEl.className = 'inline-sub ' + (change >= 0 ? 'positive' : 'negative');
+      document.getElementById('kpiRange').textContent = `${formatPrice(Math.max(...highs))} / ${formatPrice(Math.min(...lows))}`;
+    }
+
+    // 根據實際交易日動態計算所有空缺（週末 + 台灣國定假日 + 任何非交易日）
+    function calcRangeBreaks(dates) {
+      if (!dates || dates.length < 2) return [{ bounds: ['sat', 'mon'] }];
+      const breaks = [{ bounds: ['sat', 'mon'] }]; // 先跳週末
+      // 再找出相鄰交易日之間 > 1 個工作日的空缺（假日）
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1]);
+        const curr = new Date(dates[i]);
+        const diffDays = (curr - prev) / 86400000;
+        if (diffDays > 1) {
+          // 把這段空缺加進 rangebreaks
+          const gapStart = new Date(prev); gapStart.setDate(gapStart.getDate() + 1);
+          const gapEnd   = new Date(curr);
+          // 只加非週末的空缺（週末已被上面的 bounds 處理了）
+          // 確認這段空缺裡有非週末的日子
+          let hasWeekday = false;
+          const d = new Date(gapStart);
+          while (d < gapEnd) {
+            const dow = d.getDay();
+            if (dow !== 0 && dow !== 6) { hasWeekday = true; break; }
+            d.setDate(d.getDate() + 1);
+          }
+          if (hasWeekday) {
+            breaks.push({
+              values: (() => {
+                const gap = [];
+                const d2 = new Date(gapStart);
+                while (d2 < gapEnd) {
+                  const dow = d2.getDay();
+                  if (dow !== 0 && dow !== 6) gap.push(d2.toISOString().slice(0, 10));
+                  d2.setDate(d2.getDate() + 1);
+                }
+                return gap;
+              })()
+            });
+          }
+        }
+      }
+      return breaks;
+    }
+
+    // ── 自訂 Tooltip ──────────────────────────────────────────
+    const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtDate(dateStr) {
+      const d = new Date(dateStr);
+      return `${MONTHS_EN[d.getMonth()]}. ${d.getDate()}, ${d.getFullYear()}`;
+    }
+    function fp(v) { return Number(v).toFixed(2); }
+
+    function getOrCreateTooltip(containerId) {
+      const id = containerId + '_tip';
+      let tip = document.getElementById(id);
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.id = id;
+        tip.style.cssText = [
+          'position:absolute','pointer-events:none','display:none','z-index:9999',
+          'background:#1a1a1a','border:1px solid #4f98a3','border-radius:8px',
+          'padding:10px 14px','font-family:Satoshi,Inter,sans-serif',
+          'font-size:13px','color:#ffffff','line-height:1.7',
+          'white-space:nowrap','box-shadow:0 4px 16px rgba(0,0,0,0.5)'
+        ].join(';');
+        const container = document.getElementById(containerId);
+        container.parentElement.style.position = 'relative';
+        container.parentElement.appendChild(tip);
+      }
+      return tip;
+    }
+
+    // ── 主繪圖函式 ────────────────────────────────────────────
+    function renderCandles(containerId, rows, titleSuffix) {
+      const inc     = cssVar('--color-danger');
+      const dec     = cssVar('--color-success');
+      const divider = cssVar('--color-divider');
+      const text    = cssVar('--color-text-muted');
+      const surface = cssVar('--color-surface');
+      const bg      = cssVar('--color-bg');
+      const dates   = rows.map(r => r.date);
+
+      // 蠟燭寬度：以 6 個月（~130 根）為基準，根數多時仍維持夠粗
+      const n = rows.length;
+      const candleLineWidth = Math.max(1, Math.min(14, Math.round(5 * 130 / Math.max(n, 130))));
+
+      // ── 找最高點 ──
+      const highs = rows.map(r => r.high ?? r.max);
+      const maxVal = Math.max(...highs);
+      const maxIdx = highs.indexOf(maxVal);
+      const maxDate = dates[maxIdx];
+      const maxClose = rows[maxIdx]?.close ?? maxVal;
+
+      // 最高點標示：箭頭 + 價格標籤
+      const peakAnnotation = {
+        x: maxDate,
+        y: maxVal,
+        xref: 'x', yref: 'y',
+        text: `▼ 最高 ${fp(maxVal)}`,
+        showarrow: false,
+        font: { size: 12, color: '#FFD700', family: 'Satoshi, Inter, sans-serif' },
+        xanchor: 'center',
+        yanchor: 'bottom',
+        yshift: 6,
+        bgcolor: 'rgba(30,28,24,0.82)',
+        bordercolor: '#FFD700',
+        borderwidth: 1,
+        borderpad: 4
+      };
+
+      const candle = {
+        type: 'candlestick',
+        x: dates,
+        open: rows.map(r => r.open),
+        high: highs,
+        low: rows.map(r => r.low ?? r.min),
+        close: rows.map(r => r.close),
+        increasing: { line: { color: inc, width: candleLineWidth }, fillcolor: inc },
+        decreasing: { line: { color: dec, width: candleLineWidth }, fillcolor: dec },
+        whiskerwidth: 0.3,
+        xaxis: 'x', yaxis: 'y',
+        name: titleSuffix,
+        hoverinfo: 'none'
+      };
+
+      const volume = {
+        type: 'bar',
+        x: dates,
+        y: rows.map(r => Math.round((r.volume ?? r.Trading_Volume ?? 0) / 1000)),
+        marker: { color: rows.map(r => ((r.close - r.open) >= 0 ? inc : dec)) },
+        opacity: 0.85,
+        xaxis: 'x2', yaxis: 'y2',
+        name: '成交量',
+        hoverinfo: 'none'
+      };
+
+      // 最高點垂直線（用 shape）
+      const peakLine = {
+        type: 'line',
+        xref: 'x', yref: 'paper',
+        x0: maxDate, x1: maxDate,
+        y0: 0, y1: 1,
+        line: { color: 'rgba(255,215,0,0.35)', width: 1, dash: 'dot' }
+      };
+
+      const layout = {
+        margin: { l: 62, r: 80, t: 28, b: 22 },
+        paper_bgcolor: surface,
+        plot_bgcolor: surface,
+        showlegend: false,
+        dragmode: 'pan',
+        hovermode: 'closest',
+        hoverdistance: 30,
+        spikedistance: -1,
+        shapes: [peakLine],
+        annotations: [peakAnnotation],
+        xaxis: {
+          domain: [0, 1], anchor: 'y', showgrid: true, gridcolor: divider, linecolor: divider,
+          tickfont: { color: text, size: 10 }, rangeslider: { visible: false }, type: 'date',
+          showspikes: true, spikemode: 'across', spikecolor: '#4f98a3', spikethickness: 1, spikedash: 'dot',
+          rangebreaks: calcRangeBreaks(dates)
+        },
+        yaxis: {
+          domain: [0.32, 1], showgrid: true, gridcolor: divider, zeroline: false,
+          tickfont: { color: text, size: 10 }, side: 'right', fixedrange: false,
+          showspikes: true, spikemode: 'across', spikecolor: '#4f98a3', spikethickness: 1, spikedash: 'dot',
+          tickformat: ',.'
+        },
+        xaxis2: {
+          domain: [0, 1], anchor: 'y2', matches: 'x', showgrid: true, gridcolor: divider,
+          tickfont: { color: text, size: 10 }, type: 'date', showspikes: false
+        },
+        yaxis2: {
+          domain: [0, 0.23], showgrid: true, gridcolor: divider, zeroline: false,
+          tickfont: { color: text, size: 10 }, side: 'right',
+          tickformat: ',.0f',
+          title: { text: '量', font: { color: text, size: 10 } }
+        },
+        font: { family: 'Satoshi, Inter, sans-serif', color: text },
+        separators: ',.',
+        bargap: 0.12
+      };
+
+      const config = {
+        responsive: true, displaylogo: false,
+        modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d'],
+        scrollZoom: true
+      };
+
+      Plotly.newPlot(containerId, [candle, volume], layout, config);
+      const el = document.getElementById(containerId);
+      el.style.background = bg;
+
+      // 游標改箭頭
+      setTimeout(() => {
+        el.querySelectorAll('.drag,.nsewdrag,.ewdrag,.nsdrag').forEach(d => d.style.cursor = 'default');
+      }, 120);
+
+      // ── 自訂 Tooltip ──
+      const tip = getOrCreateTooltip(containerId);
+      const chartWrap = el.parentElement;
+
+      el.on('plotly_hover', function(eventData) {
+        const pts = eventData.points;
+        if (!pts || !pts.length) return;
+        const pt = pts.find(p => p.data.type === 'candlestick') || pts[0];
+        if (!pt) return;
+
+        const dateStr = pt.x || pt.data.x[pt.pointIndex];
+        const idx = pt.pointIndex;
+        const o = pt.data.open[idx];
+        const h = pt.data.high[idx];
+        const l = pt.data.low[idx];
+        const c = pt.data.close[idx];
+        const isUp = c >= o;
+        const priceColor = isUp ? inc : dec;
+
+        // 成交量：FinMind 回傳股數，除以 1000 轉換為張
+        const volRaw = (rows[idx]?.volume ?? rows[idx]?.Trading_Volume ?? 0) / 1000;
+        const volStr = Math.round(volRaw).toLocaleString('zh-TW');
+
+        // 距最高
+        const diff = c - maxVal;
+        const diffPct = ((diff / maxVal) * 100).toFixed(2);
+        const diffStr = `${diff >= 0 ? '+' : ''}${fp(diff)} (${diffPct}%)`;
+
+        // 法人
+        const dateKey = (dateStr || '').slice(0, 10);
+        const fNet = state.instForeign[dateKey];
+        const tNet = state.instTrust[dateKey];
+        const instLines = [
+          fNet !== undefined ? `<div style="color:${fNet>=0?inc:dec};font-size:11px">外資&nbsp;${fNet>=0?'+':''}${Number(fNet).toLocaleString('zh-TW')} 張</div>` : '',
+          tNet !== undefined ? `<div style="color:${tNet>=0?'#5b9cf6':'#a78bfa'};font-size:11px">投信&nbsp;${tNet>=0?'+':''}${Number(tNet).toLocaleString('zh-TW')} 張</div>` : ''
+        ].filter(Boolean).join('');
+
+        tip.innerHTML = `
+          <div style="color:#888;font-size:11px;margin-bottom:4px">${fmtDate(dateStr)}</div>
+          <div style="font-weight:700;font-size:14px;color:${priceColor}">收&nbsp;&nbsp;${fp(c)}</div>
+          <div style="font-weight:700;color:${priceColor}">高&nbsp;&nbsp;${fp(h)}</div>
+          <div style="color:#444;margin:3px 0;font-size:10px">──────────</div>
+          <div style="color:#ccc">開&nbsp;&nbsp;${fp(o)}</div>
+          <div style="color:#ccc">低&nbsp;&nbsp;${fp(l)}</div>
+          <div style="color:#aaa;font-size:11px">量&nbsp;&nbsp;${volStr} 張</div>
+          <div style="color:#444;margin:3px 0;font-size:10px">──────────</div>
+          <div style="color:#FFD700;font-size:11px">距最高 ${diffStr}</div>
+          ${instLines ? '<div style="color:#444;margin:3px 0;font-size:10px">──────────</div>' + instLines : ''}
+        `;
+
+        const mouseEvt = eventData.event;
+        if (!mouseEvt) { tip.style.display = 'block'; return; }
+        const bbox = chartWrap.getBoundingClientRect();
+        let x = mouseEvt.clientX - bbox.left + 16;
+        let y = mouseEvt.clientY - bbox.top - 20;
+        const tipW = 180;
+        if (x + tipW > chartWrap.offsetWidth - 10) x = mouseEvt.clientX - bbox.left - tipW - 10;
+        tip.style.left = x + 'px';
+        tip.style.top = Math.max(0, y) + 'px';
+        tip.style.display = 'block';
+      });
+
+      el.on('plotly_unhover', () => { tip.style.display = 'none'; });
+      el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    }
+
+    async function fetchInstitutional(symbol) {
+      const setStatus = (msg, color='#979693') => {
+        ['daily','weekly'].forEach(p => {
+          const wrap = document.getElementById(p + 'InstWrap');
+          const status = document.getElementById(p + 'InstStatus');
+          if (wrap) wrap.style.display = '';
+          if (status) { status.textContent = msg; status.style.color = color; }
+          // 先隱藏圖表
+          ['ForeignWrap','TrustWrap'].forEach(s => {
+            const el = document.getElementById(p + s);
+            if (el) el.style.display = 'none';
+          });
+        });
+      };
+
+      setStatus('⏳ 載入法人資料中...');
+      const foreign = {}, trust = {};
+      const start = new Date();
+      start.setFullYear(start.getFullYear() - 2);
+      const startDate = start.toISOString().slice(0, 10);
+      const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=${encodeURIComponent(symbol)}&start_date=${startDate}`;
+      try {
+        const res = await fetch(url);
+        const json = await res.json();
+        console.log('[法人API] stat:', json.stat, 'msg:', json.msg, '筆數:', (json.data||[]).length);
+
+        if (!json.data || json.data.length === 0) {
+          setStatus(`⚠️ 法人資料為空（${json.msg || json.stat || '無訊息'}）`, '#ffa94d');
+          return { foreign, trust };
+        }
+
+        json.data.forEach(r => {
+          const d = String(r.date || '').slice(0, 10);
+          const net = (Number(r.buy) || 0) - (Number(r.sell) || 0);
+          const n = r.name || '';
+          if (n === 'Foreign_Investor' || n.includes('外資')) foreign[d] = (foreign[d] || 0) + net;
+          if (n === 'Investment_Trust' || n === '投信')       trust[d]   = (trust[d]   || 0) + net;
+        });
+
+        const names = [...new Set((json.data||[]).map(r=>r.name))];
+        console.log('[法人] names:', names, '外資日數:', Object.keys(foreign).length, '投信日數:', Object.keys(trust).length);
+
+        if (!Object.keys(foreign).length && !Object.keys(trust).length) {
+          setStatus(`⚠️ 名稱不符，實際：${names.join('、')}`, '#ffa94d');
+          return { foreign, trust };
+        }
+        // 成功 → 清除 status
+        setStatus('', '#979693');
+
+      } catch(e) {
+        console.error('[法人]', e);
+        setStatus(`❌ 載入失敗：${e.message}`, '#e46a80');
+      }
+      return { foreign, trust };
+    }
+
+    function renderOneInstChart(chartId, dates, vals, color1, color2, title, xRange, kDates) {
+      const surface = cssVar('--color-surface');
+      const divider = cssVar('--color-divider');
+      const text    = cssVar('--color-text-muted');
+      let cum = 0;
+      const cumVals = vals.map(v => (cum += v));
+      // 用 K 線日期計算 rangebreaks，確保 x 軸結構完全一致
+      const breaks = calcRangeBreaks(kDates && kDates.length ? kDates : dates);
+
+      Plotly.newPlot(chartId, [
+        {
+          type: 'bar', x: dates, y: vals, name: title,
+          marker: { color: vals.map(v => v >= 0 ? color1 : color2) },
+          opacity: 0.9, hovertemplate: '<b>%{x|%Y/%m/%d}</b><br>' + title + '：%{y:+,.0f} 張<extra></extra>'
+        },
+        {
+          type: 'scatter', mode: 'lines', x: dates, y: cumVals,
+          name: '累計', yaxis: 'y2',
+          line: { color: color1, width: 1.8, shape: 'spline' },
+          hoverinfo: 'skip'
+        }
+      ], {
+        margin: { l: 62, r: 80, t: 2, b: 20 },
+        paper_bgcolor: surface, plot_bgcolor: surface,
+        showlegend: false, dragmode: 'pan', hovermode: 'x',
+        annotations: [{
+          xref: 'paper', yref: 'paper',
+          x: -0.04, y: 0.5,
+          text: title, textangle: -90, showarrow: false,
+          font: { size: 10, color: color1 },
+          xanchor: 'right', yanchor: 'middle'
+        }],
+        xaxis: {
+          type: 'date', showgrid: true, gridcolor: divider,
+          tickfont: { color: text, size: 9 },
+          rangeslider: { visible: false },
+          rangebreaks: breaks,
+          range: xRange
+        },
+        yaxis: { showgrid: true, gridcolor: divider, zeroline: true, zerolinecolor: '#4f98a3', zerolinewidth: 1, tickfont: { color: text, size: 9 }, side: 'right', tickformat: ',.0f' },
+        yaxis2: { overlaying: 'y', side: 'left', showgrid: false, zeroline: false, showticklabels: false },
+        font: { family: 'Satoshi, Inter, sans-serif', color: text },
+        bargap: 0.12
+      }, { responsive: true, displaylogo: false, scrollZoom: true });
+    }
+
+    function renderInstCharts(prefix, rows) { return; // charts removed, data still in tooltip
+      const rangeKey = prefix === 'daily' ? state.dailyRange : state.weeklyRange;
+      const option = RANGE_OPTIONS.find(r => r.key === rangeKey) || RANGE_OPTIONS[4];
+      const cutoff = getCutoff(option.days);
+      const filteredDates = rows
+        .map(r => String(r.date || '').slice(0, 10))
+        .filter(d => new Date(d) >= cutoff);
+
+      const fDates = [], fVals = [], tDates = [], tVals = [];
+      filteredDates.forEach(d => {
+        if (state.instForeign[d] !== undefined) { fDates.push(d); fVals.push(state.instForeign[d]); }
+        if (state.instTrust[d]   !== undefined) { tDates.push(d); tVals.push(state.instTrust[d]);   }
+      });
+
+      // 永遠顯示 wrap（不再隱藏）
+      const wrap = document.getElementById(prefix + 'InstWrap');
+      if (wrap) wrap.style.display = '';
+
+      const status = document.getElementById(prefix + 'InstStatus');
+      const fWrap  = document.getElementById(prefix + 'ForeignWrap');
+      const tWrap  = document.getElementById(prefix + 'TrustWrap');
+
+      if (!fDates.length && !tDates.length) {
+        // 沒資料：只顯示提示，不蓋掉 fetchInstitutional 的錯誤訊息
+        if (status && !status.textContent) {
+          status.textContent = '⚠️ 此時段無法人資料';
+          status.style.color = '#ffa94d';
+        }
+        if (fWrap) fWrap.style.display = 'none';
+        if (tWrap) tWrap.style.display = 'none';
+        return;
+      }
+
+      // 有資料 → 清除 status，顯示圖表
+      if (status) { status.textContent = ''; }
+
+      const inc = cssVar('--color-danger');
+      const dec = cssVar('--color-success');
+
+      // K 線日期 → 對齊 x 軸範圍 + rangebreaks
+      const kDates = filteredDates;
+      const xRange = kDates.length >= 2 ? [kDates[0], kDates[kDates.length - 1]] : undefined;
+
+      if (fDates.length && fWrap) {
+        fWrap.style.display = '';
+        renderOneInstChart(prefix + 'ForeignChart', fDates, fVals, inc, dec, '外資', xRange, kDates);
+      } else if (fWrap) { fWrap.style.display = 'none'; }
+
+      if (tDates.length && tWrap) {
+        tWrap.style.display = '';
+        renderOneInstChart(prefix + 'TrustChart', tDates, tVals, '#5b9cf6', '#a78bfa', '投信', xRange, kDates);
+      } else if (tWrap) { tWrap.style.display = 'none'; }
+    }
+
+    function renderCharts() {
+      const dailyRows = filterRows(state.rawDaily, state.dailyRange).map(r => ({ ...r, high: r.max, low: r.min, volume: r.Trading_Volume }));
+      const weeklyRows = filterRows(state.weekly, state.weeklyRange);
+      renderCandles('dailyChart', dailyRows, '日K');
+      renderCandles('weeklyChart', weeklyRows, '週K');
+      renderInstCharts('daily',  dailyRows);
+      renderInstCharts('weekly', weeklyRows);
+      updateSummary(state.rawDaily);
+      emptyState.style.display = 'none';
+    }
+
+    async function searchStock() {
+      const query = (symbolInput.value || state.symbol).trim();
+      if (!query) return;
+      searchBtn.disabled = true;
+      searchBtn.textContent = '載入中';
+
+      ['daily','weekly'].forEach(p => {
+        const w = document.getElementById(p + 'InstWrap');
+        const s = document.getElementById(p + 'InstStatus');
+
+      });
+
+      try {
+        const resolved = await resolveSymbol(query);
+        state.symbol = resolved.stock_id;
+        state.stockName = resolved.stock_name || resolved.stock_id || query;
+
+        // K線和法人資料並行抓取
+        const [daily, inst] = await Promise.all([
+          fetchDailyStock(state.symbol),
+          fetchInstitutional(state.symbol)
+        ]);
+        state.rawDaily = daily;
+        state.weekly = aggregateWeekly(daily);
+        state.instForeign = inst.foreign;
+        state.instTrust   = inst.trust;
+        renderCharts();
+      } catch (error) {
+        emptyState.style.display = 'block';
+        emptyState.textContent = error.message || '載入失敗';
+      } finally {
+        searchBtn.disabled = false;
+        searchBtn.textContent = '查詢';
+      }
+    }
+
+    function renderRangeControls() {
+      buildRangeButtons('dailyRanges', state.dailyRange, (key) => {
+        state.dailyRange = key;
+        renderRangeControls();
+        renderCharts();
+      });
+      buildRangeButtons('weeklyRanges', state.weeklyRange, (key) => {
+        state.weeklyRange = key;
+        renderRangeControls();
+        renderCharts();
+      });
+    }
+
+    document.getElementById('themeToggle').addEventListener('click', () => setTheme(state.theme === 'dark' ? 'light' : 'dark'));
+    searchBtn.addEventListener('click', searchStock);
+    symbolInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchStock(); });
+    window.addEventListener('resize', () => { if (state.rawDaily.length) resizeAllCharts(); });
+
+    setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    renderRangeControls();
+    symbolInput.value = state.symbol;
+    searchStock();
+  </script>
+</body></body>
+</html>
